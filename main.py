@@ -182,10 +182,25 @@ def main(args):
             args.start_epoch = checkpoint['epoch'] + 1
 
     if args.eval:
-        test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
+        test_stats, coco_evaluator, all_results = evaluate(model, criterion, postprocessors,
                                               data_loader_val, base_ds, device, args.output_dir)
         if args.output_dir:
             utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
+            
+            # 如果 all_results 中包含 PyTorch 张量，需要将其转为列表
+            all_results_serializable = {
+                k: {
+                    'scores': v['scores'].cpu().tolist(),
+                    'labels': v['labels'].cpu().tolist(),
+                    'boxes': v['boxes'].cpu().tolist()  # 转为普通的列表
+                }
+                for k, v in all_results.items()
+            }
+            
+            # 保存 all_results 字典到一个 json 文件
+            json_file = output_dir / "all_results.json"
+            with open(json_file, 'w') as f:
+                json.dump(all_results_serializable, f)
         return
 
     print("Start training")

@@ -68,7 +68,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, output_dir):
     model.eval()
     criterion.eval()
-
+    
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
@@ -85,6 +85,9 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             output_dir=os.path.join(output_dir, "panoptic_eval"),
         )
 
+    # store all results, independent with coco_evaluator
+    all_results = {}
+    
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -110,6 +113,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+        all_results.update(res)
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -148,4 +152,4 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         stats['PQ_all'] = panoptic_res["All"]
         stats['PQ_th'] = panoptic_res["Things"]
         stats['PQ_st'] = panoptic_res["Stuff"]
-    return stats, coco_evaluator
+    return stats, coco_evaluator, all_results
